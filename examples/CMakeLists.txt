@@ -9,3 +9,6 @@ target_link_libraries(example_event_study PRIVATE hfmetal)
 
 add_executable(example_comprehensive cpp/comprehensive_example.cpp)
 target_link_libraries(example_comprehensive PRIVATE hfmetal)
+
+add_executable(example_spy_mgarch cpp/spy_mgarch_rolling.cpp)
+target_link_libraries(example_spy_mgarch PRIVATE hfmetal)

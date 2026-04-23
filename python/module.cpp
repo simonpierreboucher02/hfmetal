@@ -25,6 +25,7 @@
 #include "hfm/estimators/iv.hpp"
 #include "hfm/timeseries/local_projections.hpp"
 #include "hfm/simulation/bootstrap.hpp"
+#include "hfm/simulation/mcmc.hpp"
 
 namespace py = pybind11;
 using namespace hfm;
@@ -550,6 +551,170 @@ PYBIND11_MODULE(_hfmetal, m) {
         .def_readonly("max_horizon", &LPResult::max_horizon)
         .def_readonly("n_obs", &LPResult::n_obs)
         .def_readonly("elapsed_ms", &LPResult::elapsed_ms);
+
+    // ========== MCMCChain ==========
+    py::class_<MCMCChain>(m, "MCMCChain")
+        .def_property_readonly("samples", [](const MCMCChain& c) { return matrix_to_numpy(c.samples); })
+        .def_property_readonly("log_posterior", [](const MCMCChain& c) { return vector_to_numpy(c.log_posterior); })
+        .def_readonly("n_dim", &MCMCChain::n_dim)
+        .def_readonly("n_kept", &MCMCChain::n_kept)
+        .def_readonly("acceptance_rate", &MCMCChain::acceptance_rate)
+        .def_property_readonly("mean", [](const MCMCChain& c) { return vector_to_numpy(c.mean); })
+        .def_property_readonly("std_dev", [](const MCMCChain& c) { return vector_to_numpy(c.std_dev); })
+        .def_property_readonly("median", [](const MCMCChain& c) { return vector_to_numpy(c.median); })
+        .def_property_readonly("ci_lower", [](const MCMCChain& c) { return vector_to_numpy(c.ci_lower); })
+        .def_property_readonly("ci_upper", [](const MCMCChain& c) { return vector_to_numpy(c.ci_upper); })
+        .def_property_readonly("posterior_cov", [](const MCMCChain& c) { return matrix_to_numpy(c.posterior_cov); })
+        .def_property_readonly("ess", [](const MCMCChain& c) { return vector_to_numpy(c.ess); })
+        .def_property_readonly("autocorr_lag1", [](const MCMCChain& c) { return vector_to_numpy(c.autocorr_lag1); })
+        .def_property_readonly("geweke_z", [](const MCMCChain& c) { return vector_to_numpy(c.geweke_z); })
+        .def_readonly("sampler", &MCMCChain::sampler)
+        .def_readonly("elapsed_ms", &MCMCChain::elapsed_ms);
+
+    // ========== BayesGARCHResult ==========
+    py::class_<BayesGARCHResult>(m, "BayesGARCHResult")
+        .def_readonly("chain", &BayesGARCHResult::chain)
+        .def_readonly("omega_mean", &BayesGARCHResult::omega_mean)
+        .def_readonly("alpha_mean", &BayesGARCHResult::alpha_mean)
+        .def_readonly("beta_mean", &BayesGARCHResult::beta_mean)
+        .def_readonly("persistence_mean", &BayesGARCHResult::persistence_mean)
+        .def_readonly("omega_ci_lower", &BayesGARCHResult::omega_ci_lower)
+        .def_readonly("omega_ci_upper", &BayesGARCHResult::omega_ci_upper)
+        .def_readonly("alpha_ci_lower", &BayesGARCHResult::alpha_ci_lower)
+        .def_readonly("alpha_ci_upper", &BayesGARCHResult::alpha_ci_upper)
+        .def_readonly("beta_ci_lower", &BayesGARCHResult::beta_ci_lower)
+        .def_readonly("beta_ci_upper", &BayesGARCHResult::beta_ci_upper)
+        .def_property_readonly("conditional_var", [](const BayesGARCHResult& r) { return vector_to_numpy(r.conditional_var); })
+        .def_readonly("dic", &BayesGARCHResult::dic)
+        .def_readonly("waic", &BayesGARCHResult::waic)
+        .def_readonly("marginal_likelihood", &BayesGARCHResult::marginal_likelihood)
+        .def_readonly("elapsed_ms", &BayesGARCHResult::elapsed_ms);
+
+    // ========== BayesGJRResult ==========
+    py::class_<BayesGJRResult>(m, "BayesGJRResult")
+        .def_readonly("chain", &BayesGJRResult::chain)
+        .def_readonly("omega_mean", &BayesGJRResult::omega_mean)
+        .def_readonly("alpha_mean", &BayesGJRResult::alpha_mean)
+        .def_readonly("gamma_mean", &BayesGJRResult::gamma_mean)
+        .def_readonly("beta_mean", &BayesGJRResult::beta_mean)
+        .def_readonly("nu_mean", &BayesGJRResult::nu_mean)
+        .def_readonly("persistence_mean", &BayesGJRResult::persistence_mean)
+        .def_readonly("omega_ci_lower", &BayesGJRResult::omega_ci_lower)
+        .def_readonly("omega_ci_upper", &BayesGJRResult::omega_ci_upper)
+        .def_readonly("alpha_ci_lower", &BayesGJRResult::alpha_ci_lower)
+        .def_readonly("alpha_ci_upper", &BayesGJRResult::alpha_ci_upper)
+        .def_readonly("gamma_ci_lower", &BayesGJRResult::gamma_ci_lower)
+        .def_readonly("gamma_ci_upper", &BayesGJRResult::gamma_ci_upper)
+        .def_readonly("beta_ci_lower", &BayesGJRResult::beta_ci_lower)
+        .def_readonly("beta_ci_upper", &BayesGJRResult::beta_ci_upper)
+        .def_readonly("nu_ci_lower", &BayesGJRResult::nu_ci_lower)
+        .def_readonly("nu_ci_upper", &BayesGJRResult::nu_ci_upper)
+        .def_property_readonly("conditional_var", [](const BayesGJRResult& r) { return vector_to_numpy(r.conditional_var); })
+        .def_readonly("waic", &BayesGJRResult::waic)
+        .def_readonly("elapsed_ms", &BayesGJRResult::elapsed_ms);
+
+    // ========== PredictiveResult ==========
+    py::class_<PredictiveResult>(m, "PredictiveResult")
+        .def_property_readonly("simulated_returns", [](const PredictiveResult& r) { return matrix_to_numpy(r.simulated_returns); })
+        .def_property_readonly("simulated_vol", [](const PredictiveResult& r) { return matrix_to_numpy(r.simulated_vol); })
+        .def_property_readonly("mean_forecast", [](const PredictiveResult& r) { return vector_to_numpy(r.mean_forecast); })
+        .def_property_readonly("vol_forecast", [](const PredictiveResult& r) { return vector_to_numpy(r.vol_forecast); })
+        .def_property_readonly("vol_ci_lower", [](const PredictiveResult& r) { return vector_to_numpy(r.vol_ci_lower); })
+        .def_property_readonly("vol_ci_upper", [](const PredictiveResult& r) { return vector_to_numpy(r.vol_ci_upper); })
+        .def_readonly("n_ahead", &PredictiveResult::n_ahead)
+        .def_readonly("n_posterior", &PredictiveResult::n_posterior);
+
+    // Metropolis-Hastings (general)
+    m.def("metropolis_hastings", [](py::array_t<f64> initial_arr,
+                                     py::function log_density_fn,
+                                     std::size_t n_samples, std::size_t burn_in,
+                                     std::size_t thin, py::array_t<f64> proposal_scale_arr,
+                                     bool adapt, uint64_t seed) {
+        auto initial = numpy_to_vector(initial_arr);
+        LogDensityFn cpp_fn = [&log_density_fn](const Vector<f64>& theta) -> f64 {
+            auto arr = vector_to_numpy(theta);
+            py::object result = log_density_fn(arr);
+            return result.cast<f64>();
+        };
+        MHOptions opts;
+        opts.n_samples = n_samples;
+        opts.burn_in = burn_in;
+        opts.thin = thin;
+        opts.adapt = adapt;
+        opts.seed = seed;
+        if (proposal_scale_arr.size() > 0) {
+            opts.proposal_scale = numpy_to_vector(proposal_scale_arr);
+        }
+        auto result = metropolis_hastings(initial, cpp_fn, opts);
+        if (!result) throw std::runtime_error("MH failed: " + result.status().message());
+        return std::move(result).value();
+    }, py::arg("initial"), py::arg("log_density"),
+       py::arg("n_samples") = 10000, py::arg("burn_in") = 2000,
+       py::arg("thin") = 1, py::arg("proposal_scale") = py::array_t<f64>(),
+       py::arg("adapt") = true, py::arg("seed") = 42,
+       "Metropolis-Hastings MCMC sampler");
+
+    // Bayesian GARCH
+    m.def("bayesian_garch", [](py::array_t<f64> returns_arr,
+                                std::size_t n_samples, std::size_t burn_in,
+                                std::size_t thin, uint64_t seed) {
+        auto r = numpy_to_vector(returns_arr);
+        BayesGARCHOptions opts;
+        opts.n_samples = n_samples;
+        opts.burn_in = burn_in;
+        opts.thin = thin;
+        opts.seed = seed;
+        auto result = bayesian_garch(r, opts);
+        if (!result) throw std::runtime_error("Bayesian GARCH failed: " + result.status().message());
+        return std::move(result).value();
+    }, py::arg("returns"), py::arg("n_samples") = 10000,
+       py::arg("burn_in") = 5000, py::arg("thin") = 1, py::arg("seed") = 42,
+       "Bayesian GARCH(1,1) via Adaptive Metropolis");
+
+    // Bayesian GJR-GARCH with Student-t
+    m.def("bayesian_gjr_garch", [](py::array_t<f64> returns_arr,
+                                    std::size_t n_samples, std::size_t burn_in,
+                                    std::size_t thin, bool estimate_nu, f64 nu_init, uint64_t seed) {
+        auto r = numpy_to_vector(returns_arr);
+        BayesGJROptions opts;
+        opts.n_samples = n_samples;
+        opts.burn_in = burn_in;
+        opts.thin = thin;
+        opts.seed = seed;
+        opts.estimate_nu = estimate_nu;
+        opts.nu_init = nu_init;
+        auto result = bayesian_gjr_garch(r, opts);
+        if (!result) throw std::runtime_error("Bayesian GJR failed: " + result.status().message());
+        return std::move(result).value();
+    }, py::arg("returns"), py::arg("n_samples") = 10000,
+       py::arg("burn_in") = 5000, py::arg("thin") = 1,
+       py::arg("estimate_nu") = true, py::arg("nu_init") = 8.0,
+       py::arg("seed") = 42,
+       "Bayesian GJR-GARCH(1,1) with Student-t errors");
+
+    // GARCH posterior predictive
+    m.def("garch_predictive", [](py::array_t<f64> returns_arr,
+                                   const BayesGARCHResult& posterior,
+                                   std::size_t n_ahead, std::size_t n_posterior, uint64_t seed) {
+        auto r = numpy_to_vector(returns_arr);
+        auto result = garch_predictive(r, posterior, n_ahead, n_posterior, seed);
+        if (!result) throw std::runtime_error("Predictive failed: " + result.status().message());
+        return std::move(result).value();
+    }, py::arg("returns"), py::arg("posterior"),
+       py::arg("n_ahead") = 10, py::arg("n_posterior") = 1000, py::arg("seed") = 42,
+       "GARCH posterior predictive simulation");
+
+    // GJR posterior predictive
+    m.def("gjr_predictive", [](py::array_t<f64> returns_arr,
+                                 const BayesGJRResult& posterior,
+                                 std::size_t n_ahead, std::size_t n_posterior, uint64_t seed) {
+        auto r = numpy_to_vector(returns_arr);
+        auto result = gjr_predictive(r, posterior, n_ahead, n_posterior, seed);
+        if (!result) throw std::runtime_error("GJR Predictive failed: " + result.status().message());
+        return std::move(result).value();
+    }, py::arg("returns"), py::arg("posterior"),
+       py::arg("n_ahead") = 10, py::arg("n_posterior") = 1000, py::arg("seed") = 42,
+       "GJR-GARCH posterior predictive simulation");
 
     m.def("local_projections", [](py::array_t<f64> y_arr, py::array_t<f64> x_arr,
                                    std::size_t max_horizon, std::size_t n_lags,

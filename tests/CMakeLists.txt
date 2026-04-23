@@ -47,6 +47,7 @@ hfm_add_test(test_local_projections unit/test_local_projections.cpp)
 
 # Simulation
 hfm_add_test(test_bootstrap unit/test_bootstrap.cpp)
+hfm_add_test(test_mcmc unit/test_mcmc.cpp)
 
 # Metal
 if(HFM_ENABLE_METAL)

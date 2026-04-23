@@ -51,6 +51,7 @@
 
 // Simulation
 #include "hfm/simulation/bootstrap.hpp"
+#include "hfm/simulation/mcmc.hpp"
 
 // Metal (conditional)
 #ifdef HFM_METAL_ENABLED
