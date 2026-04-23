@@ -49,6 +49,23 @@ hfm_add_test(test_local_projections unit/test_local_projections.cpp)
 hfm_add_test(test_bootstrap unit/test_bootstrap.cpp)
 hfm_add_test(test_mcmc unit/test_mcmc.cpp)
 
+# Diagnostics
+hfm_add_test(test_diagnostics unit/test_diagnostics.cpp)
+
+# Risk
+hfm_add_test(test_risk unit/test_risk.cpp)
+
+# Additional volatility models
+hfm_add_test(test_volatility_models unit/test_volatility_models.cpp)
+
+# Additional time series
+hfm_add_test(test_arima unit/test_arima.cpp)
+hfm_add_test(test_granger unit/test_granger.cpp)
+hfm_add_test(test_irf unit/test_irf.cpp)
+
+# Linear algebra decompositions
+hfm_add_test(test_decompositions unit/test_decompositions.cpp)
+
 # Metal
 if(HFM_ENABLE_METAL)
     hfm_add_test(test_metal_context metal/test_metal_context.cpp)

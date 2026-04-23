@@ -24,8 +24,17 @@
 #include "hfm/models/logit_probit.hpp"
 #include "hfm/estimators/iv.hpp"
 #include "hfm/timeseries/local_projections.hpp"
+#include "hfm/timeseries/arima.hpp"
+#include "hfm/timeseries/granger.hpp"
+#include "hfm/timeseries/irf.hpp"
 #include "hfm/simulation/bootstrap.hpp"
 #include "hfm/simulation/mcmc.hpp"
+#include "hfm/diagnostics/statistical_tests.hpp"
+#include "hfm/risk/measures.hpp"
+#include "hfm/models/egarch.hpp"
+#include "hfm/models/gjr_garch.hpp"
+#include "hfm/models/garch_t.hpp"
+#include "hfm/linalg/decompositions.hpp"
 
 namespace py = pybind11;
 using namespace hfm;
@@ -715,6 +724,354 @@ PYBIND11_MODULE(_hfmetal, m) {
     }, py::arg("returns"), py::arg("posterior"),
        py::arg("n_ahead") = 10, py::arg("n_posterior") = 1000, py::arg("seed") = 42,
        "GJR-GARCH posterior predictive simulation");
+
+    // ========== Diagnostics ==========
+    py::class_<JarqueBeraResult>(m, "JarqueBeraResult")
+        .def_readonly("statistic", &JarqueBeraResult::statistic)
+        .def_readonly("p_value", &JarqueBeraResult::p_value)
+        .def_readonly("skewness", &JarqueBeraResult::skewness)
+        .def_readonly("excess_kurtosis", &JarqueBeraResult::excess_kurtosis)
+        .def_readonly("n_obs", &JarqueBeraResult::n_obs);
+
+    py::class_<DurbinWatsonResult>(m, "DurbinWatsonResult")
+        .def_readonly("statistic", &DurbinWatsonResult::statistic)
+        .def_readonly("n_obs", &DurbinWatsonResult::n_obs);
+
+    py::class_<LjungBoxResult>(m, "LjungBoxResult")
+        .def_readonly("statistic", &LjungBoxResult::statistic)
+        .def_readonly("p_value", &LjungBoxResult::p_value)
+        .def_readonly("n_lags", &LjungBoxResult::n_lags);
+
+    py::class_<BreuschPaganResult>(m, "BreuschPaganResult")
+        .def_readonly("statistic", &BreuschPaganResult::statistic)
+        .def_readonly("p_value", &BreuschPaganResult::p_value)
+        .def_readonly("df", &BreuschPaganResult::df);
+
+    py::class_<ArchLMResult>(m, "ArchLMResult")
+        .def_readonly("statistic", &ArchLMResult::statistic)
+        .def_readonly("p_value", &ArchLMResult::p_value)
+        .def_readonly("n_lags", &ArchLMResult::n_lags);
+
+    py::class_<ADFResult>(m, "ADFResult")
+        .def_readonly("statistic", &ADFResult::statistic)
+        .def_readonly("p_value", &ADFResult::p_value)
+        .def_readonly("n_lags", &ADFResult::n_lags)
+        .def_readonly("critical_1pct", &ADFResult::critical_1pct)
+        .def_readonly("critical_5pct", &ADFResult::critical_5pct)
+        .def_readonly("critical_10pct", &ADFResult::critical_10pct);
+
+    py::class_<KPSSResult>(m, "KPSSResult")
+        .def_readonly("statistic", &KPSSResult::statistic)
+        .def_readonly("p_value", &KPSSResult::p_value)
+        .def_readonly("critical_1pct", &KPSSResult::critical_1pct)
+        .def_readonly("critical_5pct", &KPSSResult::critical_5pct)
+        .def_readonly("critical_10pct", &KPSSResult::critical_10pct);
+
+    py::class_<DescriptiveStats>(m, "DescriptiveStats")
+        .def_readonly("mean", &DescriptiveStats::mean)
+        .def_readonly("variance", &DescriptiveStats::variance)
+        .def_readonly("std_dev", &DescriptiveStats::std_dev)
+        .def_readonly("skewness", &DescriptiveStats::skewness)
+        .def_readonly("excess_kurtosis", &DescriptiveStats::excess_kurtosis)
+        .def_readonly("min", &DescriptiveStats::min)
+        .def_readonly("max", &DescriptiveStats::max)
+        .def_readonly("median", &DescriptiveStats::median)
+        .def_readonly("q25", &DescriptiveStats::q25)
+        .def_readonly("q75", &DescriptiveStats::q75)
+        .def_readonly("n_obs", &DescriptiveStats::n_obs);
+
+    m.def("descriptive_stats", [](py::array_t<f64> x_arr) {
+        auto x = numpy_to_vector(x_arr);
+        auto result = descriptive_stats(x);
+        if (!result) throw std::runtime_error("descriptive_stats failed");
+        return std::move(result).value();
+    }, py::arg("x"), "Compute descriptive statistics");
+
+    m.def("jarque_bera", [](py::array_t<f64> x_arr) {
+        auto x = numpy_to_vector(x_arr);
+        auto result = jarque_bera(x);
+        if (!result) throw std::runtime_error("jarque_bera failed");
+        return std::move(result).value();
+    }, py::arg("x"), "Jarque-Bera normality test");
+
+    m.def("durbin_watson", [](py::array_t<f64> residuals_arr) {
+        auto r = numpy_to_vector(residuals_arr);
+        auto result = durbin_watson(r);
+        if (!result) throw std::runtime_error("durbin_watson failed");
+        return std::move(result).value();
+    }, py::arg("residuals"), "Durbin-Watson autocorrelation test");
+
+    m.def("ljung_box", [](py::array_t<f64> x_arr, std::size_t n_lags) {
+        auto x = numpy_to_vector(x_arr);
+        auto result = ljung_box(x, n_lags);
+        if (!result) throw std::runtime_error("ljung_box failed");
+        return std::move(result).value();
+    }, py::arg("x"), py::arg("n_lags") = 10, "Ljung-Box portmanteau test");
+
+    m.def("breusch_pagan", [](py::array_t<f64> resid_arr, py::array_t<f64, py::array::c_style> X_arr) {
+        auto r = numpy_to_vector(resid_arr);
+        auto X = numpy_to_matrix(X_arr);
+        auto result = breusch_pagan(r, X);
+        if (!result) throw std::runtime_error("breusch_pagan failed");
+        return std::move(result).value();
+    }, py::arg("residuals"), py::arg("X"), "Breusch-Pagan heteroskedasticity test");
+
+    m.def("arch_lm", [](py::array_t<f64> resid_arr, std::size_t n_lags) {
+        auto r = numpy_to_vector(resid_arr);
+        auto result = arch_lm(r, n_lags);
+        if (!result) throw std::runtime_error("arch_lm failed");
+        return std::move(result).value();
+    }, py::arg("residuals"), py::arg("n_lags") = 5, "ARCH-LM test for ARCH effects");
+
+    m.def("adf_test", [](py::array_t<f64> y_arr, std::size_t max_lag) {
+        auto y = numpy_to_vector(y_arr);
+        auto result = adf_test(y, max_lag);
+        if (!result) throw std::runtime_error("adf_test failed");
+        return std::move(result).value();
+    }, py::arg("y"), py::arg("max_lag") = 0, "Augmented Dickey-Fuller unit root test");
+
+    m.def("kpss_test", [](py::array_t<f64> y_arr, bool trend, std::size_t n_lags) {
+        auto y = numpy_to_vector(y_arr);
+        auto result = kpss_test(y, trend, n_lags);
+        if (!result) throw std::runtime_error("kpss_test failed");
+        return std::move(result).value();
+    }, py::arg("y"), py::arg("trend") = false, py::arg("n_lags") = 0,
+       "KPSS stationarity test");
+
+    m.def("autocorrelation", [](py::array_t<f64> x_arr, std::size_t max_lag) {
+        auto x = numpy_to_vector(x_arr);
+        auto acf = autocorrelation(x, max_lag);
+        return vector_to_numpy(acf);
+    }, py::arg("x"), py::arg("max_lag") = 20, "Autocorrelation function");
+
+    // ========== Risk ==========
+    py::enum_<VaRMethod>(m, "VaRMethod")
+        .value("Historical", VaRMethod::Historical)
+        .value("Parametric", VaRMethod::Parametric)
+        .value("CornishFisher", VaRMethod::CornishFisher);
+
+    py::class_<VaRResult>(m, "VaRResult")
+        .def_readonly("var", &VaRResult::var)
+        .def_readonly("cvar", &VaRResult::cvar)
+        .def_readonly("confidence", &VaRResult::confidence)
+        .def_readonly("n_obs", &VaRResult::n_obs);
+
+    py::class_<DrawdownResult>(m, "DrawdownResult")
+        .def_readonly("max_drawdown", &DrawdownResult::max_drawdown)
+        .def_readonly("peak_idx", &DrawdownResult::peak_idx)
+        .def_readonly("trough_idx", &DrawdownResult::trough_idx)
+        .def_readonly("avg_drawdown", &DrawdownResult::avg_drawdown)
+        .def_property_readonly("drawdown_series", [](const DrawdownResult& r) { return vector_to_numpy(r.drawdown_series); });
+
+    py::class_<PerformanceResult>(m, "PerformanceResult")
+        .def_readonly("sharpe_ratio", &PerformanceResult::sharpe_ratio)
+        .def_readonly("sortino_ratio", &PerformanceResult::sortino_ratio)
+        .def_readonly("calmar_ratio", &PerformanceResult::calmar_ratio)
+        .def_readonly("omega_ratio", &PerformanceResult::omega_ratio)
+        .def_readonly("annualized_return", &PerformanceResult::annualized_return)
+        .def_readonly("annualized_volatility", &PerformanceResult::annualized_volatility)
+        .def_readonly("max_drawdown", &PerformanceResult::max_drawdown);
+
+    py::class_<PortfolioResult>(m, "PortfolioResult")
+        .def_property_readonly("weights", [](const PortfolioResult& r) { return vector_to_numpy(r.weights); })
+        .def_readonly("expected_return", &PortfolioResult::expected_return)
+        .def_readonly("volatility", &PortfolioResult::volatility)
+        .def_readonly("sharpe_ratio", &PortfolioResult::sharpe_ratio);
+
+    m.def("value_at_risk", [](py::array_t<f64> returns_arr, f64 confidence, const std::string& method) {
+        auto r = numpy_to_vector(returns_arr);
+        VaRMethod m_enum = VaRMethod::Historical;
+        if (method == "parametric") m_enum = VaRMethod::Parametric;
+        else if (method == "cornish_fisher") m_enum = VaRMethod::CornishFisher;
+        auto result = value_at_risk(r, confidence, m_enum);
+        if (!result) throw std::runtime_error("VaR failed");
+        return std::move(result).value();
+    }, py::arg("returns"), py::arg("confidence") = 0.95, py::arg("method") = "historical",
+       "Value at Risk and CVaR");
+
+    m.def("drawdown_analysis", [](py::array_t<f64> returns_arr) {
+        auto r = numpy_to_vector(returns_arr);
+        auto result = drawdown_analysis(r);
+        if (!result) throw std::runtime_error("drawdown failed");
+        return std::move(result).value();
+    }, py::arg("returns"), "Drawdown analysis");
+
+    m.def("performance_metrics", [](py::array_t<f64> returns_arr, f64 risk_free_rate, f64 ann_factor) {
+        auto r = numpy_to_vector(returns_arr);
+        PerformanceOptions opts;
+        opts.risk_free_rate = risk_free_rate;
+        opts.annualization_factor = ann_factor;
+        auto result = performance_metrics(r, opts);
+        if (!result) throw std::runtime_error("performance_metrics failed");
+        return std::move(result).value();
+    }, py::arg("returns"), py::arg("risk_free_rate") = 0.0, py::arg("annualization_factor") = 252.0,
+       "Performance ratios (Sharpe, Sortino, Calmar, etc.)");
+
+    m.def("minimum_variance_portfolio", [](py::array_t<f64> mu_arr, py::array_t<f64, py::array::c_style> cov_arr) {
+        auto mu = numpy_to_vector(mu_arr);
+        auto cov = numpy_to_matrix(cov_arr);
+        auto result = minimum_variance_portfolio(mu, cov);
+        if (!result) throw std::runtime_error("min variance portfolio failed");
+        return std::move(result).value();
+    }, py::arg("expected_returns"), py::arg("cov_matrix"),
+       "Minimum variance portfolio");
+
+    m.def("max_sharpe_portfolio", [](py::array_t<f64> mu_arr, py::array_t<f64, py::array::c_style> cov_arr, f64 rf) {
+        auto mu = numpy_to_vector(mu_arr);
+        auto cov = numpy_to_matrix(cov_arr);
+        PortfolioOptions opts;
+        opts.risk_free_rate = rf;
+        auto result = max_sharpe_portfolio(mu, cov, opts);
+        if (!result) throw std::runtime_error("max sharpe portfolio failed");
+        return std::move(result).value();
+    }, py::arg("expected_returns"), py::arg("cov_matrix"), py::arg("risk_free_rate") = 0.0,
+       "Maximum Sharpe ratio portfolio");
+
+    // ========== EGARCH ==========
+    py::class_<EGARCHResult>(m, "EGARCHResult")
+        .def_readonly("omega", &EGARCHResult::omega)
+        .def_readonly("alpha", &EGARCHResult::alpha)
+        .def_readonly("gamma", &EGARCHResult::gamma)
+        .def_readonly("beta", &EGARCHResult::beta)
+        .def_property_readonly("conditional_var", [](const EGARCHResult& r) { return vector_to_numpy(r.conditional_var); })
+        .def_property_readonly("std_residuals", [](const EGARCHResult& r) { return vector_to_numpy(r.std_residuals); })
+        .def_readonly("log_likelihood", &EGARCHResult::log_likelihood)
+        .def_readonly("aic", &EGARCHResult::aic)
+        .def_readonly("bic", &EGARCHResult::bic)
+        .def_readonly("converged", &EGARCHResult::converged);
+
+    m.def("egarch", [](py::array_t<f64> returns_arr, std::size_t max_iter, f64 tol) {
+        auto r = numpy_to_vector(returns_arr);
+        EGARCHOptions opts;
+        opts.max_iter = max_iter;
+        opts.tol = tol;
+        auto result = egarch(r, opts);
+        if (!result) throw std::runtime_error("EGARCH failed");
+        return std::move(result).value();
+    }, py::arg("returns"), py::arg("max_iter") = 500, py::arg("tol") = 1e-8,
+       "EGARCH(1,1) model");
+
+    // ========== GJR-GARCH ==========
+    py::class_<GJRGARCHResult>(m, "GJRGARCHResult")
+        .def_readonly("omega", &GJRGARCHResult::omega)
+        .def_readonly("alpha", &GJRGARCHResult::alpha)
+        .def_readonly("gamma", &GJRGARCHResult::gamma)
+        .def_readonly("beta", &GJRGARCHResult::beta)
+        .def_readonly("persistence", &GJRGARCHResult::persistence)
+        .def_property_readonly("conditional_var", [](const GJRGARCHResult& r) { return vector_to_numpy(r.conditional_var); })
+        .def_readonly("log_likelihood", &GJRGARCHResult::log_likelihood)
+        .def_readonly("aic", &GJRGARCHResult::aic)
+        .def_readonly("converged", &GJRGARCHResult::converged);
+
+    m.def("gjr_garch", [](py::array_t<f64> returns_arr, std::size_t max_iter, f64 tol) {
+        auto r = numpy_to_vector(returns_arr);
+        GJRGARCHOptions opts;
+        opts.max_iter = max_iter;
+        opts.tol = tol;
+        auto result = gjr_garch(r, opts);
+        if (!result) throw std::runtime_error("GJR-GARCH failed");
+        return std::move(result).value();
+    }, py::arg("returns"), py::arg("max_iter") = 500, py::arg("tol") = 1e-8,
+       "GJR-GARCH(1,1) model with leverage");
+
+    // ========== GARCH-t ==========
+    py::class_<GARCHTResult>(m, "GARCHTResult")
+        .def_readonly("omega", &GARCHTResult::omega)
+        .def_readonly("alpha", &GARCHTResult::alpha)
+        .def_readonly("beta", &GARCHTResult::beta)
+        .def_readonly("nu", &GARCHTResult::nu)
+        .def_readonly("persistence", &GARCHTResult::persistence)
+        .def_property_readonly("conditional_var", [](const GARCHTResult& r) { return vector_to_numpy(r.conditional_var); })
+        .def_readonly("log_likelihood", &GARCHTResult::log_likelihood)
+        .def_readonly("aic", &GARCHTResult::aic)
+        .def_readonly("converged", &GARCHTResult::converged);
+
+    m.def("garch_t", [](py::array_t<f64> returns_arr, std::size_t max_iter, f64 tol, f64 nu_init) {
+        auto r = numpy_to_vector(returns_arr);
+        GARCHTOptions opts;
+        opts.max_iter = max_iter;
+        opts.tol = tol;
+        opts.nu_init = nu_init;
+        auto result = garch_t(r, opts);
+        if (!result) throw std::runtime_error("GARCH-t failed");
+        return std::move(result).value();
+    }, py::arg("returns"), py::arg("max_iter") = 500, py::arg("tol") = 1e-8, py::arg("nu_init") = 8.0,
+       "GARCH(1,1) with Student-t innovations");
+
+    // ========== ARIMA ==========
+    py::class_<ARIMAResult>(m, "ARIMAResult")
+        .def_property_readonly("ar_coefficients", [](const ARIMAResult& r) { return vector_to_numpy(r.ar_coefficients); })
+        .def_property_readonly("ma_coefficients", [](const ARIMAResult& r) { return vector_to_numpy(r.ma_coefficients); })
+        .def_readonly("intercept", &ARIMAResult::intercept)
+        .def_readonly("sigma2", &ARIMAResult::sigma2)
+        .def_property_readonly("residuals", [](const ARIMAResult& r) { return vector_to_numpy(r.residuals); })
+        .def_readonly("aic", &ARIMAResult::aic)
+        .def_readonly("bic", &ARIMAResult::bic)
+        .def_readonly("p", &ARIMAResult::p)
+        .def_readonly("d", &ARIMAResult::d)
+        .def_readonly("q", &ARIMAResult::q);
+
+    m.def("arima", [](py::array_t<f64> y_arr, std::size_t p, std::size_t d, std::size_t q) {
+        auto y = numpy_to_vector(y_arr);
+        ARIMAOptions opts;
+        opts.p = p;
+        opts.d = d;
+        opts.q = q;
+        auto result = arima(y, opts);
+        if (!result) throw std::runtime_error("ARIMA failed");
+        return std::move(result).value();
+    }, py::arg("y"), py::arg("p") = 1, py::arg("d") = 0, py::arg("q") = 0,
+       "ARIMA(p,d,q) model");
+
+    // ========== Granger ==========
+    py::class_<GrangerResult>(m, "GrangerResult")
+        .def_readonly("f_statistic", &GrangerResult::f_statistic)
+        .def_readonly("p_value", &GrangerResult::p_value)
+        .def_readonly("n_lags", &GrangerResult::n_lags);
+
+    m.def("granger_causality", [](py::array_t<f64> y_arr, py::array_t<f64> x_arr, std::size_t n_lags) {
+        auto y = numpy_to_vector(y_arr);
+        auto x = numpy_to_vector(x_arr);
+        auto result = granger_causality(y, x, n_lags);
+        if (!result) throw std::runtime_error("Granger failed");
+        return std::move(result).value();
+    }, py::arg("y"), py::arg("x"), py::arg("n_lags") = 4,
+       "Granger causality test");
+
+    // ========== Forecast evaluation ==========
+    py::class_<ForecastEvalResult>(m, "ForecastEvalResult")
+        .def_readonly("mae", &ForecastEvalResult::mae)
+        .def_readonly("rmse", &ForecastEvalResult::rmse)
+        .def_readonly("mape", &ForecastEvalResult::mape)
+        .def_readonly("mse", &ForecastEvalResult::mse)
+        .def_readonly("theil_u", &ForecastEvalResult::theil_u)
+        .def_readonly("r_squared", &ForecastEvalResult::r_squared);
+
+    m.def("forecast_eval", [](py::array_t<f64> actual_arr, py::array_t<f64> forecast_arr) {
+        auto actual = numpy_to_vector(actual_arr);
+        auto forecast = numpy_to_vector(forecast_arr);
+        auto result = forecast_eval(actual, forecast);
+        if (!result) throw std::runtime_error("forecast_eval failed");
+        return std::move(result).value();
+    }, py::arg("actual"), py::arg("forecast"),
+       "Forecast evaluation metrics (MAE, RMSE, MAPE, Theil-U)");
+
+    // ========== PCA ==========
+    py::class_<PCAResult>(m, "PCAResult")
+        .def_property_readonly("components", [](const PCAResult& r) { return matrix_to_numpy(r.components); })
+        .def_property_readonly("loadings", [](const PCAResult& r) { return matrix_to_numpy(r.loadings); })
+        .def_property_readonly("explained_variance", [](const PCAResult& r) { return vector_to_numpy(r.explained_variance); })
+        .def_property_readonly("explained_ratio", [](const PCAResult& r) { return vector_to_numpy(r.explained_ratio); })
+        .def_readonly("total_variance", &PCAResult::total_variance)
+        .def_readonly("n_components", &PCAResult::n_components);
+
+    m.def("pca", [](py::array_t<f64, py::array::c_style> X_arr, std::size_t n_components) {
+        auto X = numpy_to_matrix(X_arr);
+        auto result = pca(X, n_components);
+        if (!result) throw std::runtime_error("PCA failed");
+        return std::move(result).value();
+    }, py::arg("X"), py::arg("n_components") = 0,
+       "Principal Component Analysis");
 
     m.def("local_projections", [](py::array_t<f64> y_arr, py::array_t<f64> x_arr,
                                    std::size_t max_horizon, std::size_t n_lags,

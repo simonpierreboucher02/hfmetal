@@ -53,6 +53,25 @@
 #include "hfm/simulation/bootstrap.hpp"
 #include "hfm/simulation/mcmc.hpp"
 
+// Diagnostics
+#include "hfm/diagnostics/statistical_tests.hpp"
+
+// Risk
+#include "hfm/risk/measures.hpp"
+
+// Additional models
+#include "hfm/models/egarch.hpp"
+#include "hfm/models/gjr_garch.hpp"
+#include "hfm/models/garch_t.hpp"
+
+// Additional time series
+#include "hfm/timeseries/arima.hpp"
+#include "hfm/timeseries/granger.hpp"
+#include "hfm/timeseries/irf.hpp"
+
+// Additional linear algebra
+#include "hfm/linalg/decompositions.hpp"
+
 // Metal (conditional)
 #ifdef HFM_METAL_ENABLED
 #include "hfm/metal/metal_context.hpp"

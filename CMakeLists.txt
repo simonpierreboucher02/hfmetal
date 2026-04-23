@@ -39,6 +39,8 @@ file(GLOB_RECURSE HFM_SOURCES
     src/hf/*.cpp
     src/panel/*.cpp
     src/simulation/*.cpp
+    src/diagnostics/*.cpp
+    src/risk/*.cpp
     src/api/*.cpp
 )
 
