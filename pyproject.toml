@@ -1,0 +1,43 @@
+[build-system]
+requires = ["scikit-build-core>=0.5", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "hfmetal"
+version = "0.1.0"
+description = "High-frequency econometrics engine for Apple Silicon with Metal GPU acceleration"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Simon-Pierre Boucher", email = "spbou4@icloud.com"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Operating System :: MacOS",
+]
+dependencies = [
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "duckdb"]
+
+[tool.scikit-build]
+cmake.args = [
+    "-DHFM_BUILD_TESTS=OFF",
+    "-DHFM_BUILD_BENCHMARKS=OFF",
+    "-DHFM_BUILD_EXAMPLES=OFF",
+    "-DHFM_BUILD_PYTHON=ON",
+    "-DCMAKE_BUILD_TYPE=Release",
+]
+wheel.packages = ["python/hfmetal"]
+wheel.install-dir = "hfmetal"
+install.components = ["python"]
+
+[tool.scikit-build.cmake.define]
+HFM_BUILD_PYTHON = "ON"

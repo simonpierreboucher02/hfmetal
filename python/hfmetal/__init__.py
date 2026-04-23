@@ -1,0 +1,93 @@
+"""HFMetal: High-frequency econometrics engine for Apple Silicon.
+
+This module provides Python bindings for the HFMetal C++ library.
+"""
+
+from _hfmetal import (
+    # Enums
+    Backend,
+    CovarianceType,
+
+    # Result types
+    OLSResult,
+    RollingOLSResult,
+    GLSResult,
+    PanelResult,
+    FamaMacBethResult,
+    ARResult,
+    VARResult,
+    RealizedMeasuresResult,
+    EventStudyResult,
+    BootstrapResult,
+
+    # Functions
+    log_returns,
+    simple_returns,
+    realized_variance,
+    realized_volatility,
+    bipower_variation,
+    compute_realized_measures,
+    ols,
+    rolling_ols,
+    gls,
+    fgls,
+    ar,
+    var,
+    event_study,
+    fixed_effects,
+    fama_macbeth,
+    bootstrap,
+    har_rv,
+    garch,
+    GARCHResult,
+    logit,
+    probit,
+    BinaryModelResult,
+    iv_2sls,
+    IVResult,
+    local_projections,
+    LPResult,
+)
+
+__version__ = "0.1.0"
+
+__all__ = [
+    "Backend",
+    "CovarianceType",
+    "OLSResult",
+    "RollingOLSResult",
+    "GLSResult",
+    "PanelResult",
+    "FamaMacBethResult",
+    "ARResult",
+    "VARResult",
+    "RealizedMeasuresResult",
+    "EventStudyResult",
+    "BootstrapResult",
+    "log_returns",
+    "simple_returns",
+    "realized_variance",
+    "realized_volatility",
+    "bipower_variation",
+    "compute_realized_measures",
+    "ols",
+    "rolling_ols",
+    "gls",
+    "fgls",
+    "ar",
+    "var",
+    "event_study",
+    "fixed_effects",
+    "fama_macbeth",
+    "bootstrap",
+    "har_rv",
+    "garch",
+    "GARCHResult",
+    "logit",
+    "probit",
+    "BinaryModelResult",
+    "iv_2sls",
+    "IVResult",
+    "local_projections",
+    "LPResult",
+]

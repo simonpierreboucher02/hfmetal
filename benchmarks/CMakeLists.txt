@@ -1,0 +1,10 @@
+function(hfm_add_benchmark name source)
+    add_executable(${name} ${source})
+    target_link_libraries(${name} PRIVATE hfmetal benchmark::benchmark benchmark::benchmark_main)
+endfunction()
+
+hfm_add_benchmark(bench_returns cpu/bench_returns.cpp)
+hfm_add_benchmark(bench_realized cpu/bench_realized.cpp)
+hfm_add_benchmark(bench_ols cpu/bench_ols.cpp)
+hfm_add_benchmark(bench_linalg cpu/bench_linalg.cpp)
+hfm_add_benchmark(bench_rolling rolling/bench_rolling_ols.cpp)
